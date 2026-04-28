@@ -154,36 +154,34 @@
         document.getElementById('modeBtn').innerText = isGM ? "Tryb: DM" : "Tryb: GRACZ";
     }
 
-    function handleMaps(files) {
+    // FIX: createImageBitmap(file) zamiast FileReader+img.src=dataURL
+    // Discord Activity blokuje data: URL przez CSP – bitmap ładuje się bezpośrednio z File
+    async function handleMaps(files) {
         document.getElementById('dropHint').style.display = 'none';
         for (let file of files) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    maps.push({ name: file.name, img: img, tokens: [], gridSize: 70, gridAlpha: 0.3, gridType: 'square' });
-                    renderMapList();
-                    if (activeMapIdx === -1) selectMap(0);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+            try {
+                const bitmap = await createImageBitmap(file);
+                maps.push({ name: file.name, bitmap, tokens: [], gridSize: 70, gridAlpha: 0.3, gridType: 'square' });
+                renderMapList();
+                if (activeMapIdx === -1) selectMap(0);
+            } catch(e) {
+                console.error('handleMaps error:', e);
+                alert('Nie można wczytać mapy „' + file.name + '": ' + e.message);
+            }
         }
     }
 
-    function handleTokens(files) {
+    async function handleTokens(files) {
         if (activeMapIdx === -1) { alert("Najpierw dodaj i wybierz mapę!"); return; }
         for (let file of files) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    maps[activeMapIdx].tokens.push({ x: 150, y: 150, img: img, fileName: file.name });
-                    draw();
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+            try {
+                const bitmap = await createImageBitmap(file);
+                maps[activeMapIdx].tokens.push({ x: 150, y: 150, bitmap, fileName: file.name });
+                draw();
+            } catch(e) {
+                console.error('handleTokens error:', e);
+                alert('Nie można wczytać tokenu „' + file.name + '": ' + e.message);
+            }
         }
     }
 
@@ -222,9 +220,9 @@
     function draw() {
         if (activeMapIdx === -1) return;
         const m = maps[activeMapIdx];
-        canvas.width = m.img.width;
-        canvas.height = m.img.height;
-        ctx.drawImage(m.img, 0, 0);
+        canvas.width = m.bitmap.width;
+        canvas.height = m.bitmap.height;
+        ctx.drawImage(m.bitmap, 0, 0);
 
         ctx.strokeStyle = `rgba(255,255,255,${m.gridAlpha})`;
         if (m.gridType === 'square') {
@@ -252,7 +250,7 @@
             const s = m.gridSize * 0.8;
             ctx.save();
             ctx.beginPath(); ctx.arc(t.x, t.y, s/2, 0, Math.PI*2); ctx.clip();
-            ctx.drawImage(t.img, t.x-s/2, t.y-s/2, s, s);
+            ctx.drawImage(t.bitmap, t.x-s/2, t.y-s/2, s, s);
             ctx.restore();
             ctx.strokeStyle = "#e8b84b"; ctx.lineWidth = 3;
             ctx.beginPath(); ctx.arc(t.x, t.y, s/2, 0, Math.PI*2); ctx.stroke();
