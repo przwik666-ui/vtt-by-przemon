@@ -7,137 +7,66 @@
     <script src="https://unpkg.com/@discord/embedded-app-sdk@1.0.0/dist/index.umd.js"></script>
     <style>
         :root {
-            --bg: #0f0f18;
-            --surface: #181825;
-            --panel: #1e1e30;
-            --accent: #c0392b;
-            --gold: #e8b84b;
-            --text: #dde1f0;
+            --bg: #0f0f18; --surface: #181825; --panel: #1e1e30;
+            --accent: #c0392b; --gold: #e8b84b; --text: #dde1f0;
+        }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--bg); font-family: 'JetBrains Mono', monospace; color: var(--text); }
+        
+        .toolbar { position: absolute; top: 0; left: 0; right: 0; height: 55px; background: #111; border-bottom: 2px solid var(--accent); display: flex; align-items: center; padding: 0 15px; z-index: 101; gap: 10px; }
+        .sidebar { position: absolute; left: 0; top: 55px; bottom: 0; width: 220px; background: var(--panel); border-right: 1px solid #333; z-index: 100; padding: 10px; overflow-y: auto; }
+        .map-container { position: absolute; left: 220px; right: 0; top: 55px; bottom: 0; overflow: hidden; background: #000; cursor: crosshair; }
+        
+        body.player-mode .toolbar, body.player-mode .sidebar, body.player-mode .controls-box { display: none !important; }
+        body.player-mode .map-container { left: 0; top: 0; height: 100vh; }
+
+        #mapCanvas { position: absolute; transform-origin: 0 0; }
+        .map-item { padding: 8px; background: #252538; cursor: pointer; border-radius: 4px; font-size: 11px; margin-bottom: 5px; border: 1px solid transparent; }
+        .map-item.active { border-color: var(--gold); background: #2d2d45; }
+        
+        .controls-box { position: absolute; bottom: 20px; right: 20px; background: rgba(0,0,0,0.9); padding: 15px; border-radius: 10px; border: 1px solid var(--gold); z-index: 100; font-size: 11px; display: flex; flex-direction: column; gap: 8px; }
+
+        /* Przyciski i labele wyglądają tak samo */
+        button, .file-label {
+            background: #252538; border: 1px solid #444; color: white;
+            padding: 5px 10px; cursor: pointer; border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace; font-size: 13px;
+            display: inline-flex; align-items: center; white-space: nowrap;
+            text-decoration: none; user-select: none;
+        }
+        button:hover, .file-label:hover { background: var(--accent); }
+
+        /* FIX: ukryj inputy, ale nie display:none – to blokuje label w niektórych iframe */
+        .file-input {
+            position: absolute; width: 1px; height: 1px;
+            opacity: 0; overflow: hidden; z-index: -1;
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        /* Modal eksportu/importu */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 200; align-items: center; justify-content: center; }
+        .modal-overlay.open { display: flex; }
+        .modal { background: var(--panel); border: 1px solid var(--gold); border-radius: 8px; padding: 20px; width: 500px; max-width: 90vw; display: flex; flex-direction: column; gap: 12px; }
+        .modal h3 { margin: 0; color: var(--gold); font-size: 14px; }
+        .modal textarea { background: #111; color: var(--text); border: 1px solid #555; border-radius: 4px; padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; resize: vertical; min-height: 150px; }
+        .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
 
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            overflow: hidden;
-            background: var(--bg);
-            font-family: 'JetBrains Mono', monospace;
-            color: var(--text);
-            touch-action: none;
-        }
-
-        .toolbar {
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 55px;
-            background: #111;
-            border-bottom: 2px solid var(--accent);
-            display: flex;
-            align-items: center;
-            padding: 0 15px;
-            z-index: 101;
-            gap: 10px;
-            user-select: none;
-        }
-
-        .sidebar {
-            position: absolute;
-            left: 0; top: 55px; bottom: 0;
-            width: 220px;
-            background: var(--panel);
-            border-right: 1px solid #333;
-            z-index: 100;
-            padding: 10px;
-            overflow-y: auto;
-        }
-
-        .map-container {
-            position: absolute;
-            left: 220px; right: 0; top: 55px; bottom: 0;
-            overflow: hidden;
-            background: #000;
-            cursor: crosshair;
-        }
-
-        body.player-mode .toolbar,
-        body.player-mode .sidebar,
-        body.player-mode .controls-box {
-            display: none !important;
-        }
-
-        body.player-mode .map-container {
-            left: 0; top: 0; height: 100vh;
-        }
-
-        #mapCanvas {
-            position: absolute;
-            transform-origin: 0 0;
-            pointer-events: auto;
-        }
-
-        .map-item {
-            padding: 8px;
-            background: #252538;
-            cursor: pointer;
-            border-radius: 4px;
-            font-size: 11px;
-            margin-bottom: 5px;
-            border: 1px solid transparent;
-        }
-
-        .map-item.active {
-            border-color: var(--gold);
-            background: #2d2d45;
-        }
-
-        .controls-box {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.9);
-            padding: 15px;
-            border-radius: 10px;
-            border: 1px solid var(--gold);
-            z-index: 100;
-            font-size: 11px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            user-select: none;
-        }
-
-        button {
-            background: #252538;
-            border: 1px solid #444;
-            color: white;
-            padding: 6px 12px;
-            cursor: pointer;
-            border-radius: 4px;
-            font-family: inherit;
-        }
-
-        button:hover {
-            background: var(--accent);
-        }
-
-        input[type="range"] {
-            width: 160px;
-        }
+        /* Drag & drop overlay na mapę */
+        .drop-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #555; font-size: 13px; pointer-events: none; }
+        .map-container.drag-over { outline: 3px dashed var(--gold); }
     </style>
 </head>
 <body>
 
 <div class="toolbar">
     <strong style="color:var(--gold)">VTT // DISCORD ACTIVITY</strong>
-    <button onclick="document.getElementById('mapInput').click()">+ Mapy</button>
-    <button onclick="document.getElementById('tokenInput').click()">+ Tokeny</button>
+
+    <!-- FIX: label zamiast button+onclick – działa w sandboxowanym iframe -->
+    <label class="file-label" for="mapInput">+ Mapy</label>
+    <label class="file-label" for="tokenInput">+ Tokeny</label>
+
     <div style="flex:1"></div>
+
     <button onclick="exportSession()" style="color:#2ecc71">💾 ZAPISZ (.json)</button>
-    <button onclick="document.getElementById('sessionInput').click()" style="color:#3498db">📂 WCZYTAJ (.json)</button>
+    <button onclick="openImportModal()" style="color:#3498db">📂 WCZYTAJ (.json)</button>
     <button onclick="toggleMode()" id="modeBtn">Tryb: DM</button>
 </div>
 
@@ -145,65 +74,78 @@
 
 <div class="map-container" id="viewport">
     <canvas id="mapCanvas"></canvas>
+    <div class="drop-hint" id="dropHint">Przeciągnij mapę tutaj lub użyj „+ Mapy"</div>
 </div>
 
 <div class="controls-box">
-    <div>Siatka: 
-        <select id="gridType" onchange="updateSettings()">
-            <option value="square">Kwadrat</option>
-            <option value="hex">Hex</option>
-        </select>
-    </div>
+    <div>Siatka: <select id="gridType" onchange="updateSettings()"><option value="square">Kwadrat</option><option value="hex">Hex</option></select></div>
     <div>Rozmiar: <input type="range" id="gridSize" min="30" max="150" value="70" oninput="updateSettings()"></div>
     <div>Widoczność: <input type="range" id="gridAlpha" min="0" max="100" value="30" oninput="updateSettings()"></div>
     <div style="font-size:9px; color:var(--gold)">SHIFT+LPM: Miarka | PPM: Pointer</div>
 </div>
 
-<input type="file" id="mapInput" multiple style="display:none" onchange="handleMaps(this.files)">
-<input type="file" id="tokenInput" multiple style="display:none" onchange="handleTokens(this.files)">
-<input type="file" id="sessionInput" style="display:none" accept=".json" onchange="importSession(this)">
+<!-- FIX: opacity:0 zamiast display:none – labele mogą aktywować input -->
+<input type="file" id="mapInput" class="file-input" multiple accept="image/*" onchange="handleMaps(this.files)">
+<input type="file" id="tokenInput" class="file-input" multiple accept="image/*" onchange="handleTokens(this.files)">
+
+<!-- Modal eksportu -->
+<div class="modal-overlay" id="exportModal">
+    <div class="modal">
+        <h3>💾 Eksport sesji — skopiuj JSON</h3>
+        <textarea id="exportText" readonly></textarea>
+        <div class="modal-btns">
+            <button onclick="copyExport()" style="color:#2ecc71">📋 Kopiuj</button>
+            <button onclick="closeModal('exportModal')">✕ Zamknij</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal importu -->
+<div class="modal-overlay" id="importModal">
+    <div class="modal">
+        <h3>📂 Import sesji — wklej JSON</h3>
+        <textarea id="importText" placeholder='Wklej tu zawartość vtt_session.json...'></textarea>
+        <div class="modal-btns">
+            <button onclick="importFromModal()" style="color:#3498db">✓ Wczytaj</button>
+            <button onclick="closeModal('importModal')">✕ Zamknij</button>
+        </div>
+    </div>
+</div>
 
 <script>
-    const CLIENT_ID = "1498579538735529994"; 
-    let discordSdk = null;
+    /* ─── DISCORD SDK SETUP ─── */
+    const CLIENT_ID = "1498579538735529994";
 
-    // ==================== DISCORD SDK ====================
     async function initDiscord() {
+        // FIX: usunięto nadmiarowy nawias zamykający (błąd składni)
+        const sdk = new DiscordSDK(CLIENT_ID);
+        await sdk.ready();
         try {
-            discordSdk = new DiscordSDK(CLIENT_ID);
-            await discordSdk.ready();
-            console.log("✅ Discord Embedded App SDK initialized successfully");
-            
-            // Na razie wyłączamy authorize – często powoduje problemy przy testach
-            // Możesz odkomentować później, gdy aplikacja będzie gotowa
-            /*
-            const { code } = await discordSdk.commands.authorize({
+            const { code } = await sdk.commands.authorize({
                 client_id: CLIENT_ID,
                 response_type: "code",
-                scope: ["identify", "guilds"],
+                state: "",
+                prompt: "none",
+                scope: ["identify", "guilds.bundle"],
             });
-            console.log("Authorization code received");
-            */
-        } catch (error) {
-            console.error("❌ Discord SDK Error:", error);
+            console.log("Discord authorized, code:", code);
+        } catch(e) {
+            console.warn("Discord auth skipped:", e.message);
         }
     }
 
-    // ==================== VTT LOGIKA ====================
+    /* ─── LOGIKA VTT ─── */
     const canvas = document.getElementById('mapCanvas');
     const ctx = canvas.getContext('2d');
     const viewport = document.getElementById('viewport');
 
     let maps = [];
     let activeMapIdx = -1;
-    let zoom = 1;
-    let mX = 0, mY = 0;
+    let zoom = 1, mX = 0, mY = 0;
     let isGM = true;
 
-    let isDraggingMap = false;
-    let isDraggingToken = null;
-    let rulerStart = null;
-    let rulerEnd = null;
+    let isDraggingMap = false, isDraggingToken = null;
+    let rulerStart = null, rulerEnd = null;
     let ping = null;
 
     function toggleMode() {
@@ -213,19 +155,13 @@
     }
 
     function handleMaps(files) {
+        document.getElementById('dropHint').style.display = 'none';
         for (let file of files) {
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
-                    maps.push({
-                        name: file.name,
-                        img: img,
-                        tokens: [],
-                        gridSize: 70,
-                        gridAlpha: 0.3,
-                        gridType: 'square'
-                    });
+                    maps.push({ name: file.name, img: img, tokens: [], gridSize: 70, gridAlpha: 0.3, gridType: 'square' });
                     renderMapList();
                     if (activeMapIdx === -1) selectMap(0);
                 };
@@ -236,18 +172,13 @@
     }
 
     function handleTokens(files) {
-        if (activeMapIdx === -1) return;
+        if (activeMapIdx === -1) { alert("Najpierw dodaj i wybierz mapę!"); return; }
         for (let file of files) {
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
-                    maps[activeMapIdx].tokens.push({
-                        x: 150,
-                        y: 150,
-                        img: img,
-                        fileName: file.name
-                    });
+                    maps[activeMapIdx].tokens.push({ x: 150, y: 150, img: img, fileName: file.name });
                     draw();
                 };
                 img.src = e.target.result;
@@ -280,228 +211,180 @@
                 x: Math.floor(px / m.gridSize) * m.gridSize + m.gridSize / 2,
                 y: Math.floor(py / m.gridSize) * m.gridSize + m.gridSize / 2
             };
+        } else {
+            const h = m.gridSize, w = Math.sqrt(3)/2 * h;
+            const row = Math.round(py / (h * 0.75));
+            const col = Math.round((px - (row % 2 !== 0 ? w/2 : 0)) / w);
+            return { x: col * w + (row % 2 !== 0 ? w/2 : 0), y: row * (h * 0.75) };
         }
-        // Hex grid - uproszczone (można rozbudować później)
-        return { x: px, y: py };
     }
 
     function draw() {
         if (activeMapIdx === -1) return;
         const m = maps[activeMapIdx];
-
         canvas.width = m.img.width;
         canvas.height = m.img.height;
-
         ctx.drawImage(m.img, 0, 0);
 
-        // Grid
         ctx.strokeStyle = `rgba(255,255,255,${m.gridAlpha})`;
-        ctx.lineWidth = 1;
-
         if (m.gridType === 'square') {
-            for (let x = 0; x <= canvas.width; x += m.gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
-            }
-            for (let y = 0; y <= canvas.height; y += m.gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
+            ctx.beginPath();
+            for(let x=0; x<=canvas.width; x+=m.gridSize) { ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); }
+            for(let y=0; y<=canvas.height; y+=m.gridSize) { ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); }
+            ctx.stroke();
+        } else {
+            const h = m.gridSize, w = Math.sqrt(3)/2 * h;
+            for (let r = 0; r < canvas.height/(h*0.75)+1; r++) {
+                for (let c = 0; c < canvas.width/w+1; c++) {
+                    const cx = c * w + (r % 2 !== 0 ? w/2 : 0), cy = r * (h * 0.75);
+                    ctx.beginPath();
+                    for(let i=0; i<6; i++) {
+                        const a = (Math.PI/180)*(60*i-30);
+                        const vx = cx + h/2 * Math.cos(a), vy = cy + h/2 * Math.sin(a);
+                        if(i===0) ctx.moveTo(vx,vy); else ctx.lineTo(vx,vy);
+                    }
+                    ctx.closePath(); ctx.stroke();
+                }
             }
         }
 
-        // Tokens
         m.tokens.forEach(t => {
             const s = m.gridSize * 0.8;
             ctx.save();
-            ctx.beginPath();
-            ctx.arc(t.x, t.y, s/2, 0, Math.PI*2);
-            ctx.clip();
-            ctx.drawImage(t.img, t.x - s/2, t.y - s/2, s, s);
+            ctx.beginPath(); ctx.arc(t.x, t.y, s/2, 0, Math.PI*2); ctx.clip();
+            ctx.drawImage(t.img, t.x-s/2, t.y-s/2, s, s);
             ctx.restore();
-
-            ctx.strokeStyle = "#e8b84b";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(t.x, t.y, s/2, 0, Math.PI*2);
-            ctx.stroke();
+            ctx.strokeStyle = "#e8b84b"; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(t.x, t.y, s/2, 0, Math.PI*2); ctx.stroke();
         });
 
-        // Ruler
         if (rulerStart && rulerEnd) {
-            ctx.strokeStyle = "yellow";
-            ctx.lineWidth = 4;
-            ctx.setLineDash([10, 5]);
-            ctx.beginPath();
-            ctx.moveTo(rulerStart.x, rulerStart.y);
-            ctx.lineTo(rulerEnd.x, rulerEnd.y);
-            ctx.stroke();
+            ctx.strokeStyle = "yellow"; ctx.lineWidth = 4; ctx.setLineDash([10,5]);
+            ctx.beginPath(); ctx.moveTo(rulerStart.x, rulerStart.y); ctx.lineTo(rulerEnd.x, rulerEnd.y); ctx.stroke();
             ctx.setLineDash([]);
-
-            const distance = Math.hypot(rulerEnd.x - rulerStart.x, rulerEnd.y - rulerStart.y);
-            const ft = Math.round((distance / m.gridSize) * 5);
+            const ft = Math.round((Math.hypot(rulerEnd.x-rulerStart.x, rulerEnd.y-rulerStart.y)/m.gridSize)*5);
+            ctx.fillStyle = "rgba(0,0,0,0.8)";
+            ctx.font = "bold 24px Arial";
             const txt = ft + " ft";
-
-            ctx.fillStyle = "rgba(0,0,0,0.85)";
-            ctx.font = "bold 22px Arial";
             const tw = ctx.measureText(txt).width;
-            ctx.fillRect(rulerEnd.x + 10, rulerEnd.y - 45, tw + 20, 35);
-
+            ctx.fillRect(rulerEnd.x, rulerEnd.y - 35, tw + 20, 40);
             ctx.fillStyle = "white";
-            ctx.fillText(txt, rulerEnd.x + 20, rulerEnd.y - 20);
+            ctx.fillText(txt, rulerEnd.x + 10, rulerEnd.y - 8);
         }
 
-        // Ping
         if (ping) {
-            ctx.strokeStyle = `rgba(255, 60, 60, ${ping.a})`;
-            ctx.lineWidth = 6;
-            ctx.beginPath();
-            ctx.arc(ping.x, ping.y, ping.r, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.strokeStyle = `rgba(255,0,0,${ping.a})`; ctx.lineWidth = 5;
+            ctx.beginPath(); ctx.arc(ping.x, ping.y, ping.r, 0, Math.PI*2); ctx.stroke();
         }
 
         canvas.style.transform = `translate(${mX}px, ${mY}px) scale(${zoom})`;
     }
 
-    // ==================== EVENTY ====================
     viewport.onmousedown = (e) => {
         if (activeMapIdx === -1) return;
         const rect = canvas.getBoundingClientRect();
-        const mx = (e.clientX - rect.left) / zoom;
-        const my = (e.clientY - rect.top) / zoom;
-
-        if (e.shiftKey) {
-            rulerStart = { x: mx, y: my };
-        } 
-        else if (e.button === 2) { // prawy przycisk
-            startPing(mx, my);
-        } 
+        const mx = (e.clientX - rect.left) / zoom, my = (e.clientY - rect.top) / zoom;
+        if (e.shiftKey) { rulerStart = {x:mx, y:my}; }
+        else if (e.button === 2) { startPing(mx, my); }
         else {
-            const m = maps[activeMapIdx];
-            isDraggingToken = m.tokens.find(t => 
-                Math.hypot(t.x - mx, t.y - my) < m.gridSize * 0.5
-            );
-
-            if (isDraggingToken && isGM) {
-                // drag token
-            } else {
-                isDraggingMap = true;
-            }
+            isDraggingToken = maps[activeMapIdx].tokens.find(t => Math.hypot(t.x-mx, t.y-my) < maps[activeMapIdx].gridSize/2);
+            if (!isDraggingToken || !isGM) isDraggingMap = true;
         }
     };
 
     window.onmousemove = (e) => {
         if (activeMapIdx === -1) return;
         const rect = canvas.getBoundingClientRect();
-        const mx = (e.clientX - rect.left) / zoom;
-        const my = (e.clientY - rect.top) / zoom;
-
-        if (rulerStart) {
-            rulerEnd = { x: mx, y: my };
-            draw();
-        } 
-        else if (isDraggingToken && isGM) {
-            isDraggingToken.x = mx;
-            isDraggingToken.y = my;
-            draw();
-        } 
-        else if (isDraggingMap) {
-            mX += e.movementX;
-            mY += e.movementY;
-            draw();
-        }
+        const mx = (e.clientX - rect.left) / zoom, my = (e.clientY - rect.top) / zoom;
+        if (rulerStart) { rulerEnd = {x:mx, y:my}; draw(); }
+        else if (isDraggingToken && isGM) { isDraggingToken.x = mx; isDraggingToken.y = my; draw(); }
+        else if (isDraggingMap) { mX += e.movementX; mY += e.movementY; draw(); }
     };
 
     window.onmouseup = () => {
-        if (isDraggingToken && isGM && activeMapIdx !== -1) {
-            const m = maps[activeMapIdx];
-            const center = getGridCenter(isDraggingToken.x, isDraggingToken.y, m);
-            isDraggingToken.x = center.x;
-            isDraggingToken.y = center.y;
+        if (isDraggingToken && isGM) {
+            const s = getGridCenter(isDraggingToken.x, isDraggingToken.y, maps[activeMapIdx]);
+            isDraggingToken.x = s.x; isDraggingToken.y = s.y;
         }
-
-        isDraggingMap = false;
-        isDraggingToken = null;
-        rulerStart = null;
-        rulerEnd = null;
-        draw();
+        isDraggingMap = false; isDraggingToken = null; rulerStart = null; rulerEnd = null; draw();
     };
 
-    viewport.onwheel = (e) => {
-        e.preventDefault();
-        const factor = e.deltaY < 0 ? 1.1 : 0.9;
-        zoom *= factor;
-        draw();
-    };
+    viewport.onwheel = (e) => { e.preventDefault(); zoom *= (e.deltaY < 0 ? 1.1 : 0.9); draw(); };
+    viewport.oncontextmenu = e => e.preventDefault();
 
-    viewport.oncontextmenu = (e) => e.preventDefault();
+    /* ─── DRAG & DROP na obszar mapy ─── */
+    viewport.addEventListener('dragover', (e) => { e.preventDefault(); viewport.classList.add('drag-over'); });
+    viewport.addEventListener('dragleave', () => viewport.classList.remove('drag-over'));
+    viewport.addEventListener('drop', (e) => {
+        e.preventDefault(); viewport.classList.remove('drag-over');
+        const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+        if (files.length) handleMaps(files);
+    });
 
     function startPing(x, y) {
-        ping = { x, y, r: 15, a: 1 };
-        const interval = setInterval(() => {
-            ping.r += 4;
-            ping.a -= 0.07;
-            if (ping.a <= 0) {
-                clearInterval(interval);
-                ping = null;
-            }
-            draw();
-        }, 25);
+        ping = {x, y, r: 10, a: 1};
+        const i = setInterval(() => {
+            ping.r += 3; ping.a -= 0.05;
+            if (ping.a <= 0) { clearInterval(i); ping = null; } draw();
+        }, 30);
     }
 
     function renderMapList() {
         const list = document.getElementById('mapList');
-        list.innerHTML = maps.map((m, i) => `
-            <div class="map-item ${i === activeMapIdx ? 'active' : ''}" 
-                 onclick="selectMap(${i})">
-                ${m.name}
-            </div>
-        `).join('');
+        list.innerHTML = maps.map((m, i) => `<div class="map-item ${i===activeMapIdx?'active':''}" onclick="selectMap(${i})">${m.name}</div>`).join('');
     }
 
+    /* ─── EKSPORT: modal z JSON do skopiowania ─── */
+    // FIX: a.click() download nie działa w Discord iframe – używamy modalu
     function exportSession() {
         const data = maps.map(m => ({
-            name: m.name,
-            gridSize: m.gridSize,
-            gridAlpha: m.gridAlpha,
-            gridType: m.gridType,
-            tokens: m.tokens.map(t => ({ x: t.x, y: t.y, fileName: t.fileName }))
+            name: m.name, gridSize: m.gridSize, gridAlpha: m.gridAlpha, gridType: m.gridType,
+            tokens: m.tokens.map(t => ({x:t.x, y:t.y, fileName: t.fileName}))
         }));
-
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = "vtt_session.json";
-        a.click();
+        document.getElementById('exportText').value = JSON.stringify(data, null, 2);
+        document.getElementById('exportModal').classList.add('open');
     }
 
-    function importSession(input) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const data = JSON.parse(e.target.result);
-                // Prosta implementacja - można rozbudować
-                console.log("Zaimportowano sesję:", data);
-                alert("Import sesji jeszcze nie jest w pełni zaimplementowany.");
-            } catch (err) {
-                alert("Błąd podczas importu pliku JSON");
-            }
-        };
-        reader.readAsText(input.files[0]);
+    function copyExport() {
+        const ta = document.getElementById('exportText');
+        ta.select();
+        try {
+            document.execCommand('copy');
+            alert("Skopiowano do schowka!");
+        } catch(e) {
+            alert("Zaznacz tekst ręcznie i skopiuj (Ctrl+C).");
+        }
     }
 
-    // Debug kliknięć
-    document.addEventListener('click', (e) => {
-        console.log('Click →', e.target.tagName, e.target.id || e.target.className);
-    }, true);
+    /* ─── IMPORT: modal z polem textarea ─── */
+    function openImportModal() {
+        document.getElementById('importText').value = '';
+        document.getElementById('importModal').classList.add('open');
+    }
 
-    // ==================== START ====================
+    function importFromModal() {
+        try {
+            const data = JSON.parse(document.getElementById('importText').value);
+            data.forEach(sm => {
+                const tm = maps.find(m => m.name === sm.name);
+                if (tm) {
+                    tm.gridSize = sm.gridSize; tm.gridAlpha = sm.gridAlpha; tm.gridType = sm.gridType;
+                    tm.tokens.forEach(t => { const st = sm.tokens.find(s => s.fileName === t.fileName); if(st){t.x=st.x; t.y=st.y;} });
+                }
+            });
+            closeModal('importModal');
+            draw();
+        } catch(e) {
+            alert("Błąd parsowania JSON: " + e.message);
+        }
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('open');
+    }
+
     window.onload = () => {
         initDiscord().catch(console.error);
-        console.log("VTT Ultimate loaded - test kliknięć powinien działać");
     };
 </script>
 </body>
